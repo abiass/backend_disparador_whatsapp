@@ -1,0 +1,21 @@
+services:# Render Build Configuration
+
+
+
+
+
+
+
+
+
+
+
+
+
+      # Adicione as outras variáveis de ambiente manualmente no dashboard do Render        value: 3001      - key: PORT        value: production      - key: NODE_ENV    envVars:    startCommand: npm start    buildCommand: npm install    plan: free    env: node    name: disparador-whatsapp-backend  - type: web# Este arquivo informa ao Render como buildar e rodar o backend
+
+# Build Command
+build = "npm install"
+
+# Start Command  
+start = "npm start"
