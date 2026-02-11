@@ -12,7 +12,20 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 
-dotenv.config();
+// Load .env from project root if available (we run from backend/ during dev)
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const projectRootEnv = path.resolve(__dirname, '..', '.env');
+const localEnv = path.resolve(__dirname, '.env');
+if (fs.existsSync(projectRootEnv)) {
+  dotenv.config({ path: projectRootEnv });
+  console.log('[env] Loaded environment from project root .env');
+} else if (fs.existsSync(localEnv)) {
+  dotenv.config({ path: localEnv });
+  console.log('[env] Loaded environment from backend/.env');
+} else {
+  dotenv.config();
+  console.warn('[env] No .env file found - relying on process environment variables');
+}
 
 import usuariosRoutes from './routes/usuariosRoutes.js';
 import loginRoutes from './routes/loginRoutes.js';
@@ -20,6 +33,7 @@ import campanhasRoutes from './routes/campanhasRoutes.js';
 import contatosRoutes from './routes/contatosRoutes.js';
 import templatesRelatoriosRoutes from './routes/templatesRelatoriosRoutes.js';
 import FilaDisparo from './classes/FilaDisparo.js';
+import { downloadSession, uploadSession } from './utils/sessionStore.js';
 
 /**
  * Normaliza número de telefone brasileiro para o formato DDD + 8 dígitos
@@ -94,6 +108,17 @@ app.use((req, res, next) => {
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Debug env (masked) - remove in production
+app.get('/api/_env', (req, res) => {
+  res.json({
+    db_user_set: !!process.env.DB_USER,
+    db_host_set: !!process.env.DB_HOST,
+    db_name_set: !!process.env.DB_NAME,
+    db_password_type: typeof process.env.DB_PASSWORD,
+    db_password_length: process.env.DB_PASSWORD ? process.env.DB_PASSWORD.length : 0
+  });
 });
 
 // Rotas de usuários
@@ -189,7 +214,47 @@ wppClient.on('disconnected', () => {
   console.log('WhatsApp desconectado!');
 });
 
-wppClient.initialize();
+// Session persistence: restore from Supabase Storage before initializing
+
+(async () => {
+  try {
+    await downloadSession();
+  } catch (err) {
+    console.warn('⚠️ Erro ao restaurar sessão antes de inicializar WhatsApp:', err.message);
+  }
+
+  // Inicia o client do WhatsApp
+  wppClient.initialize();
+})();
+
+// Ao autenticar, sobe a sessão para o storage (garante persistência)
+wppClient.on('authenticated', async () => {
+  try {
+    console.log('✅ WhatsApp autenticado — carregando sessão para storage');
+    await uploadSession();
+  } catch (err) {
+    console.error('❌ Erro ao subir sessão após autenticação:', err.message);
+  }
+});
+
+// Upload periódico da sessão (minutos)
+const SESSION_UPLOAD_INTERVAL = parseInt(process.env.SESSION_UPLOAD_INTERVAL_MINUTES) || 5;
+setInterval(() => {
+  uploadSession().catch(err => console.error('Erro upload periódico de sessão:', err.message));
+}, SESSION_UPLOAD_INTERVAL * 60 * 1000);
+
+// Ao finalizar o processo, tenta subir a sessão
+const gracefulUploadAndExit = async () => {
+  try {
+    await uploadSession();
+  } catch (err) {
+    console.error('Erro ao subir sessão no exit:', err.message);
+  }
+  process.exit(0);
+};
+process.on('SIGINT', gracefulUploadAndExit);
+process.on('SIGTERM', gracefulUploadAndExit);
+process.on('exit', () => { uploadSession().catch(() => {}); });
 
 // Armazenar mensagens por número com cache e timestamp
 const chatHistory = {};

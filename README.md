@@ -73,6 +73,17 @@ Veja o arquivo `.env.example` para a lista completa de variáveis necessárias.
 - `JWT_SECRET`: Chave secreta para tokens JWT
 - `FRONTEND_URL`: URL do frontend (para CORS)
 
+### Persistência de Sessão WhatsApp (opcional - gratuito)
+Se pretende usar o Render Free e manter a sessão do WhatsApp entre reinicializações, configure as seguintes variáveis no backend:
+
+- `SUPABASE_URL` - URL do projeto Supabase (ex: `https://xyz.supabase.co`)
+- `SUPABASE_SERVICE_ROLE_KEY` - Service Role Key (MANTER EM SEGREDO)
+- `SUPABASE_SESSION_BUCKET` - nome do bucket (ex: `wpp-sessions`)
+- `SESSION_FILE_KEY` - nome do arquivo zip de sessão (ex: `session-default.zip`)
+- `SESSION_UPLOAD_INTERVAL_MINUTES` - intervalo em minutos para upload periódico (default: 5)
+
+O backend já inclui `backend/utils/sessionStore.js` que faz download antes da inicialização e upload periódico/ao encerrar.
+
 ## 📡 Endpoints da API
 
 ### Autenticação

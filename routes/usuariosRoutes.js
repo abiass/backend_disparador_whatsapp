@@ -55,9 +55,17 @@ router.delete('/usuarios/:id', async (req, res) => {
 // Listar usuários
 router.get('/usuarios', async (req, res) => {
   try {
+    console.log('[usuarios] DB env debug:', {
+      DB_USER: process.env.DB_USER ? 'set' : 'not set',
+      DB_HOST: process.env.DB_HOST ? 'set' : 'not set',
+      DB_NAME: process.env.DB_NAME ? 'set' : 'not set',
+      DB_PASSWORD_type: typeof process.env.DB_PASSWORD,
+      DB_PASSWORD_len: process.env.DB_PASSWORD ? process.env.DB_PASSWORD.length : 0
+    });
     const result = await pool.query('SELECT id, nome, tipo_usuario, status, created_at FROM usuarios ORDER BY created_at DESC');
     res.json(result.rows);
   } catch (err) {
+    console.error('[usuarios] DB error:', err);
     res.status(400).json({ error: err.message });
   }
 });
